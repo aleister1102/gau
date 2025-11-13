@@ -20,6 +20,11 @@ type URLScan struct {
 	APIKey string
 }
 
+type OTXConfig struct {
+	BaseURL string
+	APIKey  string
+}
+
 type Config struct {
 	Threads           uint
 	Timeout           uint
@@ -32,5 +37,5 @@ type Config struct {
 	Output            string
 	JSON              bool
 	URLScan           URLScan
-	OTX               string
+	OTX               OTXConfig
 }

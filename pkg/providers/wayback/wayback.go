@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/lc/gau/v2/pkg/httpclient"
 	"github.com/lc/gau/v2/pkg/providers"
 	"github.com/sirupsen/logrus"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -38,6 +40,9 @@ type waybackResult [][]string
 // Fetch fetches all urls for a given domain and sends them to a channel.
 // It returns an error should one occur.
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
+	consecutiveFailures := uint(0)
+	maxFailures := c.failureBudget()
+
 	for page := uint(0); ; page++ {
 		select {
 		case <-ctx.Done():
@@ -51,8 +56,24 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 				if errors.Is(err, httpclient.ErrBadRequest) {
 					return nil
 				}
+				if shouldSkipWaybackPage(err) {
+					consecutiveFailures++
+					logrus.WithFields(logrus.Fields{
+						"provider": Name,
+						"page":     page,
+					}).Warnf("skipping wayback page after error: %v", err)
+					if consecutiveFailures >= maxFailures {
+						logrus.WithFields(logrus.Fields{
+							"provider": Name,
+							"page":     page,
+						}).Warn("stopping wayback fetch due to repeated errors")
+						return nil
+					}
+					continue
+				}
 				return fmt.Errorf("failed to fetch wayback results page %d: %s", page, err)
 			}
+			consecutiveFailures = 0
 			var result waybackResult
 			if err = jsoniter.Unmarshal(resp, &result); err != nil {
 				return fmt.Errorf("failed to decode wayback results for page %d: %s", page, err)
@@ -71,6 +92,8 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 			}
 		}
 	}
+
+	return nil
 }
 
 // formatUrl returns a formatted URL for the Wayback API
@@ -83,4 +106,29 @@ func (c *Client) formatURL(domain string, page uint) string {
 		"https://web.archive.org/cdx/search/cdx?url=%s/*&output=json&collapse=urlkey&fl=original&pageSize=100&page=%d",
 		domain, page,
 	) + filterParams
+}
+
+func (c *Client) failureBudget() uint {
+	if c.config.MaxRetries > 0 {
+		return c.config.MaxRetries
+	}
+
+	return 3
+}
+
+func shouldSkipWaybackPage(err error) bool {
+	if errors.Is(err, fasthttp.ErrTimeout) {
+		return true
+	}
+
+	if errors.Is(err, httpclient.ErrNon200Response) {
+		return true
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+
+	return false
 }

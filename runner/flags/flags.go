@@ -38,7 +38,7 @@ type Config struct {
 	Blacklist         []string          `mapstructure:"blacklist"`
 	JSON              bool              `mapstructure:"json"`
 	URLScan           URLScanConfig     `mapstructure:"urlscan"`
-	OTX               string            `mapstructure:"otx"`
+	OTX               any               `mapstructure:"otx"`
 	Outfile           string            // output file to write to
 }
 
@@ -79,7 +79,7 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 			Host:   c.URLScan.Host,
 			APIKey: c.URLScan.APIKey,
 		},
-		OTX: c.OTX,
+		OTX: normalizeOTXConfig(c.OTX),
 	}
 
 	log.SetLevel(log.ErrorLevel)
@@ -89,6 +89,55 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 	pc.Blacklist = mapset.NewThreadUnsafeSet(c.Blacklist...)
 	pc.Blacklist.Add("")
 	return pc, nil
+}
+
+func normalizeOTXConfig(raw any) providers.OTXConfig {
+	switch v := raw.(type) {
+	case nil:
+		return providers.OTXConfig{}
+	case providers.OTXConfig:
+		return v
+	case *providers.OTXConfig:
+		if v == nil {
+			return providers.OTXConfig{}
+		}
+		return *v
+	case string:
+		return providers.OTXConfig{BaseURL: strings.TrimSpace(v)}
+	case []byte:
+		return providers.OTXConfig{BaseURL: strings.TrimSpace(string(v))}
+	case fmt.Stringer:
+		return providers.OTXConfig{BaseURL: strings.TrimSpace(v.String())}
+	case map[string]string:
+		return parseOTXMapString(v)
+	case map[string]any:
+		converted := make(map[string]string, len(v))
+		for key, val := range v {
+			converted[key] = fmt.Sprint(val)
+		}
+		return parseOTXMapString(converted)
+	case map[any]any:
+		converted := make(map[string]string, len(v))
+		for key, val := range v {
+			converted[fmt.Sprint(key)] = fmt.Sprint(val)
+		}
+		return parseOTXMapString(converted)
+	default:
+		return providers.OTXConfig{BaseURL: strings.TrimSpace(fmt.Sprint(v))}
+	}
+}
+
+func parseOTXMapString(values map[string]string) providers.OTXConfig {
+	cfg := providers.OTXConfig{}
+	for key, value := range values {
+		switch strings.ToLower(strings.ReplaceAll(key, "_", "")) {
+		case "baseurl", "url", "host", "endpoint":
+			cfg.BaseURL = strings.TrimSpace(value)
+		case "apikey", "key", "token":
+			cfg.APIKey = strings.TrimSpace(value)
+		}
+	}
+	return cfg
 }
 
 type Options struct {

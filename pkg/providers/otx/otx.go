@@ -3,6 +3,10 @@ package otx
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
 
 	"github.com/bobesa/go-domain-util/domainutil"
 	jsoniter "github.com/json-iterator/go"
@@ -22,8 +26,8 @@ type Client struct {
 var _ providers.Provider = (*Client)(nil)
 
 func New(c *providers.Config) *Client {
-	if c.OTX != "" {
-		setBaseURL(c.OTX)
+	if err := setBaseURL(c.OTX.BaseURL); err != nil {
+		logrus.WithField("provider", Name).Warnf("invalid OTX base URL %q: %v; falling back to default", c.OTX.BaseURL, err)
 	}
 	return &Client{config: c}
 }
@@ -54,7 +58,7 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 		default:
 			logrus.WithFields(logrus.Fields{"provider": Name, "page": page - 1}).Infof("fetching %s", domain)
 			apiURL := c.formatURL(domain, page)
-			resp, err := httpclient.MakeRequest(c.config.Client, apiURL, c.config.MaxRetries, c.config.Timeout)
+			resp, err := httpclient.MakeRequest(c.config.Client, apiURL, c.config.MaxRetries, c.config.Timeout, c.headers()...)
 			if err != nil {
 				return fmt.Errorf("failed to fetch alienvault(%d): %s", page, err)
 			}
@@ -84,11 +88,69 @@ func (c *Client) formatURL(domain string, page uint) string {
 		category = "domain"
 	}
 
-	return fmt.Sprintf("%sapi/v1/indicators/%s/%s/url_list?limit=100&page=%d", _BaseURL, category, domain, page)
+	base, err := url.Parse(_BaseURL)
+	if err != nil {
+		return fmt.Sprintf("%sapi/v1/indicators/%s/%s/url_list?limit=100&page=%d", _BaseURL, category, domain, page)
+	}
+
+	base.Path = path.Join(base.Path, "api", "v1", "indicators", category, domain, "url_list")
+	query := base.Query()
+	query.Set("limit", "100")
+	query.Set("page", strconv.FormatUint(uint64(page), 10))
+	base.RawQuery = query.Encode()
+
+	return base.String()
 }
 
-var _BaseURL = "https://otx.alienvault.com/"
+func (c *Client) headers() []httpclient.Header {
+	if c.config.OTX.APIKey == "" {
+		return nil
+	}
 
-func setBaseURL(baseURL string) {
-	_BaseURL = baseURL
+	return []httpclient.Header{{
+		Key:   "X-OTX-API-KEY",
+		Value: c.config.OTX.APIKey,
+	}}
+}
+
+const defaultBaseURL = "https://otx.alienvault.com/"
+
+var _BaseURL = defaultBaseURL
+
+func setBaseURL(baseURL string) error {
+	trimmed := strings.TrimSpace(baseURL)
+	if trimmed == "" {
+		_BaseURL = defaultBaseURL
+		return nil
+	}
+
+	if !strings.Contains(trimmed, "://") {
+		trimmed = "https://" + strings.TrimPrefix(trimmed, "//")
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		_BaseURL = defaultBaseURL
+		return fmt.Errorf("parse base url: %w", err)
+	}
+
+	if parsed.Scheme == "" {
+		parsed.Scheme = "https"
+	}
+
+	if parsed.Host == "" {
+		_BaseURL = defaultBaseURL
+		return fmt.Errorf("base url %q missing host", baseURL)
+	}
+
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	if parsed.Path == "" {
+		parsed.Path = "/"
+	} else if !strings.HasSuffix(parsed.Path, "/") {
+		parsed.Path += "/"
+	}
+
+	_BaseURL = parsed.String()
+	return nil
 }
