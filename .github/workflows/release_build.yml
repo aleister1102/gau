@@ -7,49 +7,88 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  release:
-    name: GoReleaser
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
 
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for GoReleaser to get tags
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
 
-      - name: Import GPG key
-        if: secrets.GPG_PRIVATE_KEY != ''
-        id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v5
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-
-      - name: Prepare GoReleaser arguments
-        id: goreleaser_args
+      - name: Build and package
+        id: package
         run: |
-          if [ "${HAS_GPG}" = "true" ]; then
-            echo "args=release --clean" >> "$GITHUB_OUTPUT"
-          else
-            echo "args=release --clean --skip-sign" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          HAS_GPG: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+          set -euo pipefail
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+          TAG_NAME="${GITHUB_REF_NAME}"
+          GOOS="${{ matrix.goos }}"
+          GOARCH="${{ matrix.goarch }}"
+          BINARY_NAME="gau"
+
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="gau.exe"
+          fi
+
+          BUILD_DIR="dist/${TAG_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p "$BUILD_DIR"
+
+          GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build -o "$BUILD_DIR/$BINARY_NAME" ./cmd/gau
+
+          if [ "$GOOS" = "windows" ]; then
+            ARCHIVE_NAME="gau_${TAG_NAME}_${GOOS}_${GOARCH}.zip"
+            (cd dist && zip -j "$ARCHIVE_NAME" "${TAG_NAME}_${GOOS}_${GOARCH}/$BINARY_NAME")
+          else
+            ARCHIVE_NAME="gau_${TAG_NAME}_${GOOS}_${GOARCH}.tar.gz"
+            (cd dist && tar -czf "$ARCHIVE_NAME" -C "${TAG_NAME}_${GOOS}_${GOARCH}" "$BINARY_NAME")
+          fi
+
+          echo "archive_name=$ARCHIVE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          distribution: goreleaser
-          version: latest
-          args: ${{ steps.goreleaser_args.outputs.args }}
+          name: ${{ steps.package.outputs.archive_name }}
+          path: dist/${{ steps.package.outputs.archive_name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GO_RELEASER_GITHUB_TOKEN != '' && secrets.GO_RELEASER_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint || '' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
