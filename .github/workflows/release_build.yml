@@ -40,5 +40,5 @@ jobs:
           version: latest
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.GO_RELEASER_GITHUB_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.GO_RELEASER_GITHUB_TOKEN != '' && secrets.GO_RELEASER_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
