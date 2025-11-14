@@ -33,12 +33,23 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      - name: Prepare GoReleaser arguments
+        id: goreleaser_args
+        run: |
+          if [ "${HAS_GPG}" = "true" ]; then
+            echo "args=release --clean" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=release --clean --skip-sign" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          HAS_GPG: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: ${{ steps.goreleaser_args.outputs.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GO_RELEASER_GITHUB_TOKEN != '' && secrets.GO_RELEASER_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
-          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint || '' }}
