@@ -1,0 +1,92 @@
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build and package
+        id: package
+        run: |
+          set -euo pipefail
+
+          TAG_NAME="${GITHUB_REF_NAME}"
+          GOOS="${{ matrix.goos }}"
+          GOARCH="${{ matrix.goarch }}"
+          BINARY_NAME="gau"
+
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="gau.exe"
+          fi
+
+          BUILD_DIR="dist/${TAG_NAME}_${GOOS}_${GOARCH}"
+          mkdir -p "$BUILD_DIR"
+
+          GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build -o "$BUILD_DIR/$BINARY_NAME" ./cmd/gau
+
+          if [ "$GOOS" = "windows" ]; then
+            ARCHIVE_NAME="gau_${TAG_NAME}_${GOOS}_${GOARCH}.zip"
+            (cd dist && zip -j "$ARCHIVE_NAME" "${TAG_NAME}_${GOOS}_${GOARCH}/$BINARY_NAME")
+          else
+            ARCHIVE_NAME="gau_${TAG_NAME}_${GOOS}_${GOARCH}.tar.gz"
+            (cd dist && tar -czf "$ARCHIVE_NAME" -C "${TAG_NAME}_${GOOS}_${GOARCH}" "$BINARY_NAME")
+          fi
+
+          echo "archive_name=$ARCHIVE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.archive_name }}
+          path: dist/${{ steps.package.outputs.archive_name }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
