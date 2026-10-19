@@ -3,11 +3,26 @@ verbose = false
 retries = 15
 subdomains = false
 parameters = false
-providers = ["wayback","commoncrawl","otx","urlscan"]
+providers = ["wayback","commoncrawl","otx","arquivopt","ghostarchive","virustotal","leakix","brave","serpapi","firecrawl"]
 blacklist = ["ttf","woff","svg","png","jpg"]
 json = false
 
-[urlscan]
+[otx]
+  apikey = ""
+
+[virustotal]
+  apikey = ""
+
+[leakix]
+  apikey = ""
+
+[brave]
+  apikey = ""
+
+[serpapi]
+  apikey = ""
+
+[firecrawl]
   apikey = ""
 
 [filters]

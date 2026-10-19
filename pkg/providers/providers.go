@@ -2,6 +2,8 @@ package providers
 
 import (
 	"context"
+	"net/url"
+	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/valyala/fasthttp"
@@ -25,6 +27,26 @@ type OTXConfig struct {
 	APIKey  string
 }
 
+type VirusTotalConfig struct {
+	APIKey string
+}
+
+type LeakIXConfig struct {
+	APIKey string
+}
+
+type BraveConfig struct {
+	APIKey string
+}
+
+type SerpAPIConfig struct {
+	APIKey string
+}
+
+type FirecrawlConfig struct {
+	APIKey string
+}
+
 type Config struct {
 	Threads           uint
 	Timeout           uint
@@ -38,4 +60,30 @@ type Config struct {
 	JSON              bool
 	URLScan           URLScan
 	OTX               OTXConfig
+	VirusTotal        VirusTotalConfig
+	LeakIX            LeakIXConfig
+	Brave             BraveConfig
+	SerpAPI           SerpAPIConfig
+	Firecrawl         FirecrawlConfig
+}
+
+// MatchesDomain reports whether rawURL belongs to domain. When includeSubdomains
+// is false only an exact hostname match passes.
+func MatchesDomain(rawURL string, domain string, includeSubdomains bool) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	target := strings.ToLower(strings.TrimSuffix(domain, "."))
+	if host == "" || target == "" {
+		return false
+	}
+
+	if host == target {
+		return true
+	}
+
+	return includeSubdomains && strings.HasSuffix(host, "."+target)
 }

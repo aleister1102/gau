@@ -6,9 +6,16 @@ import (
 	"sync"
 
 	"github.com/lc/gau/v2/pkg/providers"
+	"github.com/lc/gau/v2/pkg/providers/arquivopt"
+	"github.com/lc/gau/v2/pkg/providers/brave"
 	"github.com/lc/gau/v2/pkg/providers/commoncrawl"
+	"github.com/lc/gau/v2/pkg/providers/firecrawl"
+	"github.com/lc/gau/v2/pkg/providers/ghostarchive"
+	"github.com/lc/gau/v2/pkg/providers/leakix"
 	"github.com/lc/gau/v2/pkg/providers/otx"
+	"github.com/lc/gau/v2/pkg/providers/serpapi"
 	"github.com/lc/gau/v2/pkg/providers/urlscan"
+	"github.com/lc/gau/v2/pkg/providers/virustotal"
 	"github.com/lc/gau/v2/pkg/providers/wayback"
 	"github.com/sirupsen/logrus"
 )
@@ -37,6 +44,20 @@ func (r *Runner) Init(c *providers.Config, providers []string, filters providers
 				return fmt.Errorf("error instantiating commoncrawl: %v\n", err)
 			}
 			r.Providers = append(r.Providers, cc)
+		case "arquivopt":
+			r.Providers = append(r.Providers, arquivopt.New(c, filters))
+		case "ghostarchive":
+			r.Providers = append(r.Providers, ghostarchive.New(c))
+		case "virustotal":
+			r.Providers = append(r.Providers, virustotal.New(c))
+		case "leakix":
+			r.Providers = append(r.Providers, leakix.New(c))
+		case "brave":
+			r.Providers = append(r.Providers, brave.New(c))
+		case "serpapi":
+			r.Providers = append(r.Providers, serpapi.New(c))
+		case "firecrawl":
+			r.Providers = append(r.Providers, firecrawl.New(c))
 		}
 	}
 

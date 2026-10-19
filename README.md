@@ -1,7 +1,7 @@
 # getallurls (gau)
 [![License](https://img.shields.io/badge/license-MIT-_red.svg)](https://opensource.org/licenses/MIT)
 
-getallurls (gau) fetches known URLs from AlienVault's [Open Threat Exchange](https://otx.alienvault.com), the Wayback Machine, Common Crawl, and URLScan for any given domain. Inspired by Tomnomnom's [waybackurls](https://github.com/tomnomnom/waybackurls).
+getallurls (gau) fetches known URLs from AlienVault's [Open Threat Exchange](https://otx.alienvault.com), the Wayback Machine, Common Crawl, URLScan, Arquivo.pt, GhostArchive, VirusTotal, LeakIX, Brave Search, SerpApi, and Firecrawl for any given domain. Inspired by Tomnomnom's [waybackurls](https://github.com/tomnomnom/waybackurls).
 
 # Resources
 - [Usage](#usage)
@@ -37,7 +37,7 @@ $ gau -h
 |`--mc`| list of status codes to match | gau --mc 200,500 |
 |`--mt`| list of mime-types to match |gau --mt text/html,application/json|
 |`--o`| filename to write results to | gau --o out.txt |
-|`--providers`| list of providers to use (wayback,commoncrawl,otx,urlscan) | gau --providers wayback|
+|`--providers`| list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl) | gau --providers wayback|
 |`--proxy`| http proxy to use (socks5:// or http:// | gau --proxy http://proxy.example.com:8080 |
 |`--retries`| retries for HTTP client | gau --retries 10 |
 |`--timeout`| timeout (in seconds) for HTTP client | gau --timeout 60 |
@@ -49,11 +49,20 @@ $ gau -h
 
 
 ## Configuration Files
-gau automatically looks for a configuration file at `$HOME/.gau.toml` or`%USERPROFILE%\.gau.toml`. You can point to a different configuration file using the `--config` flag. **If the configuration file is not found, gau will still run with a default configuration, but will output a message to stderr**.
+gau looks for a configuration file in this order: `$HOME/.gau.toml`, `$XDG_CONFIG_HOME/gau/.gau.toml`, `$XDG_CONFIG_HOME/gau/config.toml`, `$HOME/.config/gau/.gau.toml`, `$HOME/.config/gau/config.toml`, or `%USERPROFILE%\.gau.toml`. You can point to a different configuration file using the `--config` flag. **If the configuration file is not found, gau will still run with a default configuration, but will output a message to stderr**.
 
 You can specify options and they will be used for every subsequent run of gau. Any options provided via command line flags will override options set in the configuration file.
 
+Provider keys can also come from the environment: `URLSCAN_APIKEY`, `OTX_APIKEY`, `VIRUSTOTAL_APIKEY`, `LEAKIX_APIKEY`, `BRAVE_APIKEY`, `SERPAPI_APIKEY`, and `FIRECRAWL_APIKEY`. An environment key fills in a missing config value.
+
 An example configuration file can be found [here](https://github.com/lc/gau/blob/master/.gau.toml)
+
+### Provider notes
+
+- `brave` uses up to 3 pages of 20 results and waits 1.5 seconds between requests.
+- `serpapi` uses up to 3 Google result pages per domain. Each page is one SerpApi search.
+- `firecrawl` calls the map endpoint once per domain, returns up to 5000 links, and waits 6 seconds between domains.
+- `urlscan` is supported but is not in the default provider list. Add it to `providers` or pass `--providers urlscan` to use it.
 
 ## Installation:
 ### From source:

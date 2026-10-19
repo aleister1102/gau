@@ -25,6 +25,26 @@ type URLScanConfig struct {
 	APIKey string `mapstructure:"apikey"`
 }
 
+type VirusTotalConfig struct {
+	APIKey string `mapstructure:"apikey"`
+}
+
+type LeakIXConfig struct {
+	APIKey string `mapstructure:"apikey"`
+}
+
+type BraveConfig struct {
+	APIKey string `mapstructure:"apikey"`
+}
+
+type SerpAPIConfig struct {
+	APIKey string `mapstructure:"apikey"`
+}
+
+type FirecrawlConfig struct {
+	APIKey string `mapstructure:"apikey"`
+}
+
 type Config struct {
 	Filters           providers.Filters `mapstructure:"filters"`
 	Proxy             string            `mapstructure:"proxy"`
@@ -39,6 +59,11 @@ type Config struct {
 	JSON              bool              `mapstructure:"json"`
 	URLScan           URLScanConfig     `mapstructure:"urlscan"`
 	OTX               any               `mapstructure:"otx"`
+	VirusTotal        VirusTotalConfig  `mapstructure:"virustotal"`
+	LeakIX            LeakIXConfig      `mapstructure:"leakix"`
+	Brave             BraveConfig       `mapstructure:"brave"`
+	SerpAPI           SerpAPIConfig     `mapstructure:"serpapi"`
+	Firecrawl         FirecrawlConfig   `mapstructure:"firecrawl"`
 	Outfile           string            // output file to write to
 }
 
@@ -60,6 +85,69 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 		}
 	}
 
+	urlscanKey := c.URLScan.APIKey
+	if urlscanKey == "" {
+		if k := os.Getenv("URLSCAN_APIKEY"); k != "" {
+			urlscanKey = k
+		} else if k := os.Getenv("URLSCAN_API_KEY"); k != "" {
+			urlscanKey = k
+		}
+	}
+
+	otxCfg := normalizeOTXConfig(c.OTX)
+	if otxCfg.APIKey == "" {
+		if k := os.Getenv("OTX_APIKEY"); k != "" {
+			otxCfg.APIKey = k
+		} else if k := os.Getenv("OTX_API_KEY"); k != "" {
+			otxCfg.APIKey = k
+		}
+	}
+
+	vtKey := c.VirusTotal.APIKey
+	if vtKey == "" {
+		if k := os.Getenv("VIRUSTOTAL_APIKEY"); k != "" {
+			vtKey = k
+		} else if k := os.Getenv("VT_API_KEY"); k != "" {
+			vtKey = k
+		}
+	}
+
+	leakixKey := c.LeakIX.APIKey
+	if leakixKey == "" {
+		if k := os.Getenv("LEAKIX_APIKEY"); k != "" {
+			leakixKey = k
+		} else if k := os.Getenv("LEAKIX_API_KEY"); k != "" {
+			leakixKey = k
+		}
+	}
+
+	braveKey := c.Brave.APIKey
+	if braveKey == "" {
+		if k := os.Getenv("BRAVE_APIKEY"); k != "" {
+			braveKey = k
+		} else if k := os.Getenv("BRAVE_API_KEY"); k != "" {
+			braveKey = k
+		}
+	}
+
+	serpAPIKey := c.SerpAPI.APIKey
+	if serpAPIKey == "" {
+		if k := os.Getenv("SERPAPI_APIKEY"); k != "" {
+			serpAPIKey = k
+		} else if k := os.Getenv("SERPAPI_API_KEY"); k != "" {
+			serpAPIKey = k
+		}
+	}
+
+	firecrawlKey := c.Firecrawl.APIKey
+	if firecrawlKey == "" {
+		if k := os.Getenv("FIRECRAWL_APIKEY"); k != "" {
+			firecrawlKey = k
+		} else if k := os.Getenv("FIRECRAWL_API_KEY"); k != "" {
+			firecrawlKey = k
+		}
+	}
+
 	pc := &providers.Config{
 		Threads:           c.Threads,
 		Timeout:           c.Timeout,
@@ -77,9 +165,24 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 		JSON:      c.JSON,
 		URLScan: providers.URLScan{
 			Host:   c.URLScan.Host,
-			APIKey: c.URLScan.APIKey,
+			APIKey: urlscanKey,
 		},
-		OTX: normalizeOTXConfig(c.OTX),
+		OTX: otxCfg,
+		VirusTotal: providers.VirusTotalConfig{
+			APIKey: vtKey,
+		},
+		LeakIX: providers.LeakIXConfig{
+			APIKey: leakixKey,
+		},
+		Brave: providers.BraveConfig{
+			APIKey: braveKey,
+		},
+		SerpAPI: providers.SerpAPIConfig{
+			APIKey: serpAPIKey,
+		},
+		Firecrawl: providers.FirecrawlConfig{
+			APIKey: firecrawlKey,
+		},
 	}
 
 	log.SetLevel(log.ErrorLevel)
@@ -148,13 +251,13 @@ func New() *Options {
 	v := viper.New()
 
 	pflag.String("o", "", "filename to write results to")
-	pflag.String("config", "", "location of config file (default $HOME/.gau.toml or %USERPROFILE%\\.gau.toml)")
+	pflag.String("config", "", "location of config file (default $HOME/.gau.toml, $HOME/.config/gau/config.toml or %USERPROFILE%\\.gau.toml)")
 	pflag.Uint("threads", 1, "number of workers to spawn")
 	pflag.Uint("timeout", 45, "timeout (in seconds) for HTTP client")
 	pflag.Uint("retries", 0, "retries for HTTP client")
 	pflag.String("proxy", "", "http proxy to use")
 	pflag.StringSlice("blacklist", []string{}, "list of extensions to skip")
-	pflag.StringSlice("providers", []string{}, "list of providers to use (wayback,commoncrawl,otx,urlscan)")
+	pflag.StringSlice("providers", []string{}, "list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl)")
 	pflag.Bool("subs", false, "include subdomains of target domain")
 	pflag.Bool("fp", false, "remove different parameters of the same endpoint")
 	pflag.Bool("verbose", false, "show verbose output")
@@ -192,7 +295,28 @@ func (o *Options) ReadInConfig() (*Config, error) {
 			return o.DefaultConfig(), err
 		}
 
-		confFile = filepath.Join(home, ".gau.toml")
+		candidates := []string{
+			filepath.Join(home, ".gau.toml"),
+			filepath.Join(home, ".config", "gau", ".gau.toml"),
+			filepath.Join(home, ".config", "gau", "config.toml"),
+		}
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			candidates = append([]string{
+				filepath.Join(xdg, "gau", ".gau.toml"),
+				filepath.Join(xdg, "gau", "config.toml"),
+			}, candidates...)
+		}
+
+		for _, candidate := range candidates {
+			if _, err := os.Stat(candidate); err == nil {
+				confFile = candidate
+				break
+			}
+		}
+
+		if confFile == "" {
+			confFile = filepath.Join(home, ".gau.toml")
+		}
 	}
 
 	return o.ReadConfigFile(confFile)
@@ -230,7 +354,7 @@ func (o *Options) DefaultConfig() *Config {
 		MaxRetries:        5,
 		IncludeSubdomains: false,
 		RemoveParameters:  false,
-		Providers:         []string{"wayback", "commoncrawl", "otx", "urlscan"},
+		Providers:         []string{"wayback", "commoncrawl", "otx", "arquivopt", "ghostarchive", "virustotal", "leakix", "brave", "serpapi", "firecrawl"},
 		Blacklist:         []string{},
 		JSON:              false,
 		Outfile:           "",
