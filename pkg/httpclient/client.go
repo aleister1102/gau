@@ -2,7 +2,7 @@ package httpclient
 
 import (
 	"errors"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	"github.com/valyala/fasthttp"
@@ -19,7 +19,17 @@ type Header struct {
 	Value string
 }
 
+// MakeRequest sends a GET request.
 func MakeRequest(c *fasthttp.Client, url string, maxRetries uint, timeout uint, headers ...Header) ([]byte, error) {
+	return makeRequest(c, url, fasthttp.MethodGet, nil, maxRetries, timeout, headers...)
+}
+
+// MakeJSONRequest sends a POST request with a JSON body.
+func MakeJSONRequest(c *fasthttp.Client, url string, body []byte, maxRetries uint, timeout uint, headers ...Header) ([]byte, error) {
+	return makeRequest(c, url, fasthttp.MethodPost, body, maxRetries, timeout, headers...)
+}
+
+func makeRequest(c *fasthttp.Client, url string, method string, body []byte, maxRetries uint, timeout uint, headers ...Header) ([]byte, error) {
 	var (
 		req      *fasthttp.Request
 		respBody []byte
@@ -29,14 +39,22 @@ func MakeRequest(c *fasthttp.Client, url string, maxRetries uint, timeout uint, 
 	for i := retries; i >= 0; i-- {
 		req = fasthttp.AcquireRequest()
 
-		req.Header.SetMethod(fasthttp.MethodGet)
+		req.Header.SetMethod(method)
 		for _, header := range headers {
 			if header.Key != "" {
 				req.Header.Set(header.Key, header.Value)
 			}
 		}
+		if len(body) > 0 {
+			req.SetBody(body)
+			if len(req.Header.Peek(fasthttp.HeaderContentType)) == 0 {
+				req.Header.SetContentType("application/json")
+			}
+		}
 		req.Header.Set(fasthttp.HeaderUserAgent, getUserAgent())
-		req.Header.Set("Accept", "*/*")
+		if len(req.Header.Peek("Accept")) == 0 {
+			req.Header.Set("Accept", "*/*")
+		}
 		req.SetRequestURI(url)
 		respBody, err = doReq(c, req, timeout)
 		// if error is nil or if our request is invalid, don't retry.
@@ -86,7 +104,7 @@ func getUserAgent() string {
 		"Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
 	}
 
-	randomIndex := rand.Intn(len(payload))
+	randomIndex := rand.IntN(len(payload))
 	pick := payload[randomIndex]
 
 	return pick
