@@ -15,8 +15,6 @@ builds:
     ignore:
       - goos: darwin
         goarch: "386"
-      - goos: windows
-        goarch: "arm64"
     main: ./cmd/gau/
     ldflags:
       - -X github.com/lc/gau/v2/pkg/providers.Version={{.Version}} -s -w
