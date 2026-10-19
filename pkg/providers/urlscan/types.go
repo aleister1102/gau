@@ -1,6 +1,7 @@
 package urlscan
 
 import (
+	"encoding/json"
 	"strings"
 
 	jsoniter "github.com/json-iterator/go"
@@ -33,6 +34,9 @@ func parseSort(sort []interface{}) string {
 		switch v := t.(type) {
 		case string:
 			sortParam = append(sortParam, v)
+		case json.Number:
+			// jsoniter.Decoder.UseNumber stores numbers as encoding/json.Number.
+			sortParam = append(sortParam, v.String())
 		case jsoniter.Number:
 			sortParam = append(sortParam, v.String())
 		}
