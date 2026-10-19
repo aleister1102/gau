@@ -29,11 +29,10 @@ func WriteURLs(writer io.Writer, results <-chan string, blacklistMap mapset.Set[
 		}
 
 		if RemoveParameters {
-			key := u.Host + u.Path
-			if lastURL.Contains(key) {
-				continue
+			if lastURL.Contains(u.Host + u.Path) {
+				continue // already seen this endpoint, skip duplicate params
 			}
-			lastURL.Add(key)
+			lastURL.Add(u.Host + u.Path)
 		}
 
 		buf.B = append(buf.B, []byte(result)...)
@@ -56,7 +55,7 @@ func WriteURLsJSON(writer io.Writer, results <-chan string, blacklistMap mapset.
 			continue
 		}
 		ext := strings.TrimPrefix(strings.ToLower(path.Ext(u.Path)), ".")
-		if blacklistMap.Contains(ext) {
+		if ext != "" && blacklistMap.Contains(ext) {
 			continue
 		}
 		jr.Url = result
