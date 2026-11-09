@@ -229,9 +229,20 @@ func New() *Options {
 	pflag.String("from", "", "fetch urls from date (format: YYYYMM)")
 	pflag.String("to", "", "fetch urls to date (format: YYYYMM)")
 	pflag.Bool("version", false, "show gau version")
+	pflag.String("completion", "", "print shell completion script and exit (bash,zsh,fish,sh)")
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
+
+	if shell, _ := pflag.CommandLine.GetString("completion"); shell != "" {
+		script, err := Completion(shell, pflag.CommandLine)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		fmt.Print(script)
+		os.Exit(0)
+	}
 
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		log.Fatal(err)
