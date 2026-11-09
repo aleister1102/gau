@@ -103,13 +103,13 @@ func (c *Client) formatURL(domain string, page uint) string {
 }
 
 func (c *Client) headers() []httpclient.Header {
-	if c.config.OTX.APIKey == "" {
+	if len(c.config.OTX.APIKeys) == 0 {
 		return nil
 	}
 
 	return []httpclient.Header{{
 		Key:   "X-OTX-API-KEY",
-		Value: c.config.OTX.APIKey,
+		Value: providers.PickKey(Name, c.config.OTX.APIKeys),
 	}}
 }
 

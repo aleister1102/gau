@@ -47,7 +47,7 @@ type searchResponse struct {
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
-	if c.config.SerpAPI.APIKey == "" {
+	if len(c.config.SerpAPI.APIKeys) == 0 {
 		logrus.WithField("provider", Name).Debug("no serpapi apikey provided, skipping")
 		return nil
 	}
@@ -66,7 +66,7 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 			query.Set("q", "site:"+domain)
 			query.Set("num", "100")
 			query.Set("start", strconv.Itoa(start))
-			query.Set("api_key", c.config.SerpAPI.APIKey)
+			query.Set("api_key", providers.PickKey(Name, c.config.SerpAPI.APIKeys))
 			apiURL := "https://serpapi.com/search.json?" + query.Encode()
 
 			resp, err := httpclient.MakeRequest(c.config.Client, apiURL, c.config.MaxRetries, c.config.Timeout)

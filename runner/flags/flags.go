@@ -15,34 +15,35 @@ import (
 	"github.com/lc/gau/v2/pkg/providers"
 	"github.com/lynxsecurity/pflag"
 	"github.com/lynxsecurity/viper"
+	"github.com/mitchellh/mapstructure"
 	log "github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpproxy"
 )
 
 type URLScanConfig struct {
-	Host   string `mapstructure:"host"`
-	APIKey string `mapstructure:"apikey"`
+	Host    string   `mapstructure:"host"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type VirusTotalConfig struct {
-	APIKey string `mapstructure:"apikey"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type LeakIXConfig struct {
-	APIKey string `mapstructure:"apikey"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type BraveConfig struct {
-	APIKey string `mapstructure:"apikey"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type SerpAPIConfig struct {
-	APIKey string `mapstructure:"apikey"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type FirecrawlConfig struct {
-	APIKey string `mapstructure:"apikey"`
+	APIKeys []string `mapstructure:"apikey"`
 }
 
 type Config struct {
@@ -85,68 +86,16 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 		}
 	}
 
-	urlscanKey := c.URLScan.APIKey
-	if urlscanKey == "" {
-		if k := os.Getenv("URLSCAN_APIKEY"); k != "" {
-			urlscanKey = k
-		} else if k := os.Getenv("URLSCAN_API_KEY"); k != "" {
-			urlscanKey = k
-		}
-	}
+	urlscanKeys := providers.SplitKeys(append(c.URLScan.APIKeys, os.Getenv("URLSCAN_APIKEY"), os.Getenv("URLSCAN_API_KEY"))...)
 
 	otxCfg := normalizeOTXConfig(c.OTX)
-	if otxCfg.APIKey == "" {
-		if k := os.Getenv("OTX_APIKEY"); k != "" {
-			otxCfg.APIKey = k
-		} else if k := os.Getenv("OTX_API_KEY"); k != "" {
-			otxCfg.APIKey = k
-		}
-	}
+	otxCfg.APIKeys = providers.SplitKeys(append(otxCfg.APIKeys, os.Getenv("OTX_APIKEY"), os.Getenv("OTX_API_KEY"))...)
 
-	vtKey := c.VirusTotal.APIKey
-	if vtKey == "" {
-		if k := os.Getenv("VIRUSTOTAL_APIKEY"); k != "" {
-			vtKey = k
-		} else if k := os.Getenv("VT_API_KEY"); k != "" {
-			vtKey = k
-		}
-	}
-
-	leakixKey := c.LeakIX.APIKey
-	if leakixKey == "" {
-		if k := os.Getenv("LEAKIX_APIKEY"); k != "" {
-			leakixKey = k
-		} else if k := os.Getenv("LEAKIX_API_KEY"); k != "" {
-			leakixKey = k
-		}
-	}
-
-	braveKey := c.Brave.APIKey
-	if braveKey == "" {
-		if k := os.Getenv("BRAVE_APIKEY"); k != "" {
-			braveKey = k
-		} else if k := os.Getenv("BRAVE_API_KEY"); k != "" {
-			braveKey = k
-		}
-	}
-
-	serpAPIKey := c.SerpAPI.APIKey
-	if serpAPIKey == "" {
-		if k := os.Getenv("SERPAPI_APIKEY"); k != "" {
-			serpAPIKey = k
-		} else if k := os.Getenv("SERPAPI_API_KEY"); k != "" {
-			serpAPIKey = k
-		}
-	}
-
-	firecrawlKey := c.Firecrawl.APIKey
-	if firecrawlKey == "" {
-		if k := os.Getenv("FIRECRAWL_APIKEY"); k != "" {
-			firecrawlKey = k
-		} else if k := os.Getenv("FIRECRAWL_API_KEY"); k != "" {
-			firecrawlKey = k
-		}
-	}
+	vtKeys := providers.SplitKeys(append(c.VirusTotal.APIKeys, os.Getenv("VIRUSTOTAL_APIKEY"), os.Getenv("VT_API_KEY"))...)
+	leakixKeys := providers.SplitKeys(append(c.LeakIX.APIKeys, os.Getenv("LEAKIX_APIKEY"), os.Getenv("LEAKIX_API_KEY"))...)
+	braveKeys := providers.SplitKeys(append(c.Brave.APIKeys, os.Getenv("BRAVE_APIKEY"), os.Getenv("BRAVE_API_KEY"))...)
+	serpAPIKeys := providers.SplitKeys(append(c.SerpAPI.APIKeys, os.Getenv("SERPAPI_APIKEY"), os.Getenv("SERPAPI_API_KEY"))...)
+	firecrawlKeys := providers.SplitKeys(append(c.Firecrawl.APIKeys, os.Getenv("FIRECRAWL_APIKEY"), os.Getenv("FIRECRAWL_API_KEY"))...)
 
 	pc := &providers.Config{
 		Threads:           c.Threads,
@@ -164,24 +113,24 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 		Output:    c.Outfile,
 		JSON:      c.JSON,
 		URLScan: providers.URLScan{
-			Host:   c.URLScan.Host,
-			APIKey: urlscanKey,
+			Host:    c.URLScan.Host,
+			APIKeys: urlscanKeys,
 		},
 		OTX: otxCfg,
 		VirusTotal: providers.VirusTotalConfig{
-			APIKey: vtKey,
+			APIKeys: vtKeys,
 		},
 		LeakIX: providers.LeakIXConfig{
-			APIKey: leakixKey,
+			APIKeys: leakixKeys,
 		},
 		Brave: providers.BraveConfig{
-			APIKey: braveKey,
+			APIKeys: braveKeys,
 		},
 		SerpAPI: providers.SerpAPIConfig{
-			APIKey: serpAPIKey,
+			APIKeys: serpAPIKeys,
 		},
 		Firecrawl: providers.FirecrawlConfig{
-			APIKey: firecrawlKey,
+			APIKeys: firecrawlKeys,
 		},
 	}
 
@@ -237,7 +186,7 @@ func parseOTXMapString(values map[string]string) providers.OTXConfig {
 		case "baseurl", "url", "host", "endpoint":
 			cfg.BaseURL = strings.TrimSpace(value)
 		case "apikey", "key", "token":
-			cfg.APIKey = strings.TrimSpace(value)
+			cfg.APIKeys = providers.SplitKeys(value)
 		}
 	}
 	return cfg
@@ -335,13 +284,20 @@ func (o *Options) ReadConfigFile(name string) (*Config, error) {
 
 	var c Config
 
-	if err := o.viper.Unmarshal(&c); err != nil {
+	if err := o.viper.Unmarshal(&c, viper.DecodeHook(apiKeyDecodeHook())); err != nil {
 		return o.DefaultConfig(), err
 	}
 
 	o.getFlagValues(&c)
 
 	return &c, nil
+}
+
+// apiKeyDecodeHook lets an apikey be a TOML string (split on commas) or a list.
+func apiKeyDecodeHook() mapstructure.DecodeHookFunc {
+	return mapstructure.ComposeDecodeHookFunc(
+		mapstructure.StringToSliceHookFunc(","),
+	)
 }
 
 func (o *Options) DefaultConfig() *Config {

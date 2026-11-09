@@ -42,14 +42,14 @@ type leakixResult struct {
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
-	if c.config.LeakIX.APIKey == "" {
+	if len(c.config.LeakIX.APIKeys) == 0 {
 		logrus.WithField("provider", Name).Debug("no leakix apikey provided, skipping")
 		return nil
 	}
 
 	header := []httpclient.Header{{
 		Key:   "api-key",
-		Value: c.config.LeakIX.APIKey,
+		Value: providers.PickKey(Name, c.config.LeakIX.APIKeys),
 	}, {
 		Key:   "Accept",
 		Value: "application/json",
