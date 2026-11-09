@@ -7,6 +7,7 @@ getallurls (gau) fetches known URLs from AlienVault's [Open Threat Exchange](htt
 - [Usage](#usage)
 - [Installation](#installation)
 - [ohmyzsh note](#ohmyzsh-note)
+- [Shell completion](#shell-completion)
 
 ## Usage:
 Examples:
@@ -66,6 +67,22 @@ An example configuration file can be found [here](https://github.com/lc/gau/blob
 - `firecrawl` calls the map endpoint once per domain, returns up to 5000 links, and waits 6 seconds between domains.
 - `intelx` (Intelligence X Phonebook) searches URLs for the domain through `2.intelx.io`. Phonebook needs a paid key; free and academic keys get no Phonebook access. Set it with `[intelx] apikey` in the config or the `INTELX_APIKEY` environment variable. It polls for up to about 60 seconds per domain.
 - `urlscan` is supported but is not in the default provider list. Add it to `providers` or pass `--providers urlscan` to use it.
+
+## Shell completion
+`gau --completion <shell>` prints a completion script for `bash`, `zsh`, `fish`, or `sh` and exits.
+
+```bash
+# bash (add to ~/.bashrc)
+source <(gau --completion bash)
+
+# zsh (put the file in a directory on your fpath, then run compinit)
+gau --completion zsh > "${fpath[1]}/_gau"
+
+# fish
+gau --completion fish > ~/.config/fish/completions/gau.fish
+```
+
+`sh` prints the bash script. Plain POSIX `sh` (dash, busybox) has no completion system, so it only works where `sh` is bash.
 
 ## Installation:
 ### From source:
