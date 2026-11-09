@@ -47,6 +47,10 @@ type FirecrawlConfig struct {
 	APIKeys []string
 }
 
+type IntelXConfig struct {
+	APIKeys []string
+}
+
 type Config struct {
 	Threads           uint
 	Timeout           uint
@@ -65,6 +69,7 @@ type Config struct {
 	Brave             BraveConfig
 	SerpAPI           SerpAPIConfig
 	Firecrawl         FirecrawlConfig
+	IntelX            IntelXConfig
 }
 
 // MatchesDomain reports whether rawURL belongs to domain. When includeSubdomains

@@ -46,6 +46,10 @@ type FirecrawlConfig struct {
 	APIKeys []string `mapstructure:"apikey"`
 }
 
+type IntelXConfig struct {
+	APIKeys []string `mapstructure:"apikey"`
+}
+
 type Config struct {
 	Filters           providers.Filters `mapstructure:"filters"`
 	Proxy             string            `mapstructure:"proxy"`
@@ -65,6 +69,7 @@ type Config struct {
 	Brave             BraveConfig       `mapstructure:"brave"`
 	SerpAPI           SerpAPIConfig     `mapstructure:"serpapi"`
 	Firecrawl         FirecrawlConfig   `mapstructure:"firecrawl"`
+	IntelX            IntelXConfig      `mapstructure:"intelx"`
 	Outfile           string            // output file to write to
 }
 
@@ -96,6 +101,7 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 	braveKeys := providers.SplitKeys(append(c.Brave.APIKeys, os.Getenv("BRAVE_APIKEY"), os.Getenv("BRAVE_API_KEY"))...)
 	serpAPIKeys := providers.SplitKeys(append(c.SerpAPI.APIKeys, os.Getenv("SERPAPI_APIKEY"), os.Getenv("SERPAPI_API_KEY"))...)
 	firecrawlKeys := providers.SplitKeys(append(c.Firecrawl.APIKeys, os.Getenv("FIRECRAWL_APIKEY"), os.Getenv("FIRECRAWL_API_KEY"))...)
+	intelxKeys := providers.SplitKeys(append(c.IntelX.APIKeys, os.Getenv("INTELX_APIKEY"), os.Getenv("INTELX_API_KEY"))...)
 
 	pc := &providers.Config{
 		Threads:           c.Threads,
@@ -131,6 +137,9 @@ func (c *Config) ProviderConfig() (*providers.Config, error) {
 		},
 		Firecrawl: providers.FirecrawlConfig{
 			APIKeys: firecrawlKeys,
+		},
+		IntelX: providers.IntelXConfig{
+			APIKeys: intelxKeys,
 		},
 	}
 
@@ -206,7 +215,7 @@ func New() *Options {
 	pflag.Uint("retries", 0, "retries for HTTP client")
 	pflag.String("proxy", "", "http proxy to use")
 	pflag.StringSlice("blacklist", []string{}, "list of extensions to skip")
-	pflag.StringSlice("providers", []string{}, "list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl)")
+	pflag.StringSlice("providers", []string{}, "list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl,intelx)")
 	pflag.Bool("subs", false, "include subdomains of target domain")
 	pflag.Bool("fp", false, "remove different parameters of the same endpoint")
 	pflag.Bool("verbose", false, "show verbose output")
@@ -310,7 +319,7 @@ func (o *Options) DefaultConfig() *Config {
 		MaxRetries:        5,
 		IncludeSubdomains: false,
 		RemoveParameters:  false,
-		Providers:         []string{"wayback", "commoncrawl", "otx", "arquivopt", "ghostarchive", "virustotal", "leakix", "brave", "serpapi", "firecrawl"},
+		Providers:         []string{"wayback", "commoncrawl", "otx", "arquivopt", "ghostarchive", "virustotal", "leakix", "brave", "serpapi", "firecrawl", "intelx"},
 		Blacklist:         []string{},
 		JSON:              false,
 		Outfile:           "",

@@ -11,6 +11,7 @@ import (
 	"github.com/lc/gau/v2/pkg/providers/commoncrawl"
 	"github.com/lc/gau/v2/pkg/providers/firecrawl"
 	"github.com/lc/gau/v2/pkg/providers/ghostarchive"
+	"github.com/lc/gau/v2/pkg/providers/intelx"
 	"github.com/lc/gau/v2/pkg/providers/leakix"
 	"github.com/lc/gau/v2/pkg/providers/otx"
 	"github.com/lc/gau/v2/pkg/providers/serpapi"
@@ -58,6 +59,8 @@ func (r *Runner) Init(c *providers.Config, providers []string, filters providers
 			r.Providers = append(r.Providers, serpapi.New(c))
 		case "firecrawl":
 			r.Providers = append(r.Providers, firecrawl.New(c))
+		case "intelx":
+			r.Providers = append(r.Providers, intelx.New(c))
 		}
 	}
 
