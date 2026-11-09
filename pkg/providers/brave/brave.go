@@ -51,14 +51,14 @@ type searchResponse struct {
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
-	if c.config.Brave.APIKey == "" {
+	if len(c.config.Brave.APIKeys) == 0 {
 		logrus.WithField("provider", Name).Debug("no brave apikey provided, skipping")
 		return nil
 	}
 
 	header := httpclient.Header{
 		Key:   "X-Subscription-Token",
-		Value: c.config.Brave.APIKey,
+		Value: providers.PickKey(Name, c.config.Brave.APIKeys),
 	}
 
 	for page := 0; page < 3; page++ {

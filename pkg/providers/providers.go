@@ -18,33 +18,33 @@ type Provider interface {
 }
 
 type URLScan struct {
-	Host   string
-	APIKey string
+	Host    string
+	APIKeys []string
 }
 
 type OTXConfig struct {
 	BaseURL string
-	APIKey  string
+	APIKeys []string
 }
 
 type VirusTotalConfig struct {
-	APIKey string
+	APIKeys []string
 }
 
 type LeakIXConfig struct {
-	APIKey string
+	APIKeys []string
 }
 
 type BraveConfig struct {
-	APIKey string
+	APIKeys []string
 }
 
 type SerpAPIConfig struct {
-	APIKey string
+	APIKeys []string
 }
 
 type FirecrawlConfig struct {
-	APIKey string
+	APIKeys []string
 }
 
 type Config struct {

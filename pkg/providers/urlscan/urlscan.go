@@ -36,9 +36,9 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 	var searchAfter string
 	var header httpclient.Header
 
-	if c.config.URLScan.APIKey != "" {
+	if len(c.config.URLScan.APIKeys) > 0 {
 		header.Key = "API-Key"
-		header.Value = c.config.URLScan.APIKey
+		header.Value = providers.PickKey(Name, c.config.URLScan.APIKeys)
 	}
 
 	for page := uint(0); ; page++ {

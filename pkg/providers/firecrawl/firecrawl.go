@@ -47,7 +47,7 @@ type linkObject struct {
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
-	if c.config.Firecrawl.APIKey == "" {
+	if len(c.config.Firecrawl.APIKeys) == 0 {
 		logrus.WithField("provider", Name).Debug("no firecrawl apikey provided, skipping")
 		return nil
 	}
@@ -73,7 +73,7 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 
 		header := httpclient.Header{
 			Key:   "Authorization",
-			Value: "Bearer " + c.config.Firecrawl.APIKey,
+			Value: "Bearer " + providers.PickKey(Name, c.config.Firecrawl.APIKeys),
 		}
 		accept := httpclient.Header{
 			Key:   "Accept",

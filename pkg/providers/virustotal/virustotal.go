@@ -56,14 +56,14 @@ type vtSubdomainResponse struct {
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
-	if c.config.VirusTotal.APIKey == "" {
+	if len(c.config.VirusTotal.APIKeys) == 0 {
 		logrus.WithField("provider", Name).Debug("no virustotal apikey provided, skipping")
 		return nil
 	}
 
 	header := httpclient.Header{
 		Key:   "x-apikey",
-		Value: c.config.VirusTotal.APIKey,
+		Value: providers.PickKey(Name, c.config.VirusTotal.APIKeys),
 	}
 
 	cursor := ""

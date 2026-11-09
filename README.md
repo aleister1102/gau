@@ -53,7 +53,9 @@ gau looks for a configuration file in this order: `$HOME/.gau.toml`, `$XDG_CONFI
 
 You can specify options and they will be used for every subsequent run of gau. Any options provided via command line flags will override options set in the configuration file.
 
-Provider keys can also come from the environment: `URLSCAN_APIKEY`, `OTX_APIKEY`, `VIRUSTOTAL_APIKEY`, `LEAKIX_APIKEY`, `BRAVE_APIKEY`, `SERPAPI_APIKEY`, and `FIRECRAWL_APIKEY`. An environment key fills in a missing config value.
+Provider keys can also come from the environment: `URLSCAN_APIKEY`, `OTX_APIKEY`, `VIRUSTOTAL_APIKEY`, `LEAKIX_APIKEY`, `BRAVE_APIKEY`, `SERPAPI_APIKEY`, and `FIRECRAWL_APIKEY`. Environment keys are added to the config keys.
+
+Each provider accepts several keys and uses them in round-robin order, one per request. In the config, write `apikey = "k1"` or `apikey = ["k1", "k2"]`. In the environment, separate keys with commas, for example `VIRUSTOTAL_APIKEY="k1,k2"`.
 
 An example configuration file can be found [here](https://github.com/lc/gau/blob/master/.gau.toml)
 
