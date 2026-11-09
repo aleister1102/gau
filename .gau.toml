@@ -3,7 +3,7 @@ verbose = false
 retries = 15
 subdomains = false
 parameters = false
-providers = ["wayback","commoncrawl","otx","arquivopt","ghostarchive","virustotal","leakix","brave","serpapi","firecrawl"]
+providers = ["wayback","commoncrawl","otx","arquivopt","ghostarchive","virustotal","leakix","brave","serpapi","firecrawl","intelx"]
 blacklist = ["ttf","woff","svg","png","jpg"]
 json = false
 
@@ -23,6 +23,8 @@ json = false
   apikey = ""
 
 [firecrawl]
+
+[intelx]
   apikey = ""
 
 [filters]

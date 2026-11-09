@@ -37,7 +37,7 @@ $ gau -h
 |`--mc`| list of status codes to match | gau --mc 200,500 |
 |`--mt`| list of mime-types to match |gau --mt text/html,application/json|
 |`--o`| filename to write results to | gau --o out.txt |
-|`--providers`| list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl) | gau --providers wayback|
+|`--providers`| list of providers to use (wayback,commoncrawl,otx,urlscan,arquivopt,ghostarchive,virustotal,leakix,brave,serpapi,firecrawl,intelx) | gau --providers wayback|
 |`--proxy`| http proxy to use (socks5:// or http:// | gau --proxy http://proxy.example.com:8080 |
 |`--retries`| retries for HTTP client | gau --retries 10 |
 |`--timeout`| timeout (in seconds) for HTTP client | gau --timeout 60 |
@@ -53,7 +53,7 @@ gau looks for a configuration file in this order: `$HOME/.gau.toml`, `$XDG_CONFI
 
 You can specify options and they will be used for every subsequent run of gau. Any options provided via command line flags will override options set in the configuration file.
 
-Provider keys can also come from the environment: `URLSCAN_APIKEY`, `OTX_APIKEY`, `VIRUSTOTAL_APIKEY`, `LEAKIX_APIKEY`, `BRAVE_APIKEY`, `SERPAPI_APIKEY`, and `FIRECRAWL_APIKEY`. Environment keys are added to the config keys.
+Provider keys can also come from the environment: `URLSCAN_APIKEY`, `OTX_APIKEY`, `VIRUSTOTAL_APIKEY`, `LEAKIX_APIKEY`, `BRAVE_APIKEY`, `SERPAPI_APIKEY`, `FIRECRAWL_APIKEY`, and `INTELX_APIKEY`. Environment keys are added to the config keys.
 
 Each provider accepts several keys and uses them in round-robin order, one per request. In the config, write `apikey = "k1"` or `apikey = ["k1", "k2"]`. In the environment, separate keys with commas, for example `VIRUSTOTAL_APIKEY="k1,k2"`.
 
@@ -64,6 +64,7 @@ An example configuration file can be found [here](https://github.com/lc/gau/blob
 - `brave` uses up to 3 pages of 20 results and waits 1.5 seconds between requests.
 - `serpapi` uses up to 3 Google result pages per domain. Each page is one SerpApi search.
 - `firecrawl` calls the map endpoint once per domain, returns up to 5000 links, and waits 6 seconds between domains.
+- `intelx` (Intelligence X Phonebook) searches URLs for the domain through `2.intelx.io`. Phonebook needs a paid key; free and academic keys get no Phonebook access. Set it with `[intelx] apikey` in the config or the `INTELX_APIKEY` environment variable. It polls for up to about 60 seconds per domain.
 - `urlscan` is supported but is not in the default provider list. Add it to `providers` or pass `--providers urlscan` to use it.
 
 ## Installation:
