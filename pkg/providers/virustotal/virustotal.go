@@ -1,15 +1,18 @@
 package virustotal
 
 import (
-	"bytes"
 	"context"
+	"crypto/tls"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/lc/gau/v2/pkg/httpclient"
 	"github.com/lc/gau/v2/pkg/providers"
 	"github.com/sirupsen/logrus"
+	"github.com/valyala/fasthttp"
 )
 
 const (
@@ -19,40 +22,35 @@ const (
 var _ providers.Provider = (*Client)(nil)
 
 type Client struct {
-	config *providers.Config
+	config     *providers.Config
+	httpClient *fasthttp.Client
 }
 
 func New(c *providers.Config) *Client {
-	return &Client{config: c}
+	// The shared client can disable TLS verification. Verify the peer before
+	// sending a key in the query string, while retaining the configured dialer.
+	client := &fasthttp.Client{TLSConfig: &tls.Config{}}
+	if c.Client != nil {
+		client.Dial = c.Client.Dial
+		if c.Client.TLSConfig != nil {
+			client.TLSConfig = c.Client.TLSConfig.Clone()
+			client.TLSConfig.InsecureSkipVerify = false
+		}
+	}
+	return &Client{config: c, httpClient: client}
 }
 
 func (c *Client) Name() string {
 	return Name
 }
 
-type vtURLResponse struct {
-	Data []struct {
-		Attributes struct {
-			URL string `json:"url"`
-		} `json:"attributes"`
-		ID string `json:"id"`
-	} `json:"data"`
-	Links struct {
-		Next string `json:"next"`
-	} `json:"links"`
-	Error *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-	} `json:"error"`
-}
-
-type vtSubdomainResponse struct {
-	Data []struct {
-		ID string `json:"id"`
-	} `json:"data"`
-	Links struct {
-		Next string `json:"next"`
-	} `json:"links"`
+type domainReport struct {
+	ResponseCode *int `json:"response_code"`
+	DetectedURLs []struct {
+		URL string `json:"url"`
+	} `json:"detected_urls"`
+	// Only the first element is the URL; JSON decoding discards the remaining metadata.
+	UndetectedURLs [][1]string `json:"undetected_urls"`
 }
 
 func (c *Client) Fetch(ctx context.Context, domain string, results chan string) error {
@@ -60,107 +58,70 @@ func (c *Client) Fetch(ctx context.Context, domain string, results chan string) 
 		logrus.WithField("provider", Name).Debug("no virustotal apikey provided, skipping")
 		return nil
 	}
-
-	header := httpclient.Header{
-		Key:   "x-apikey",
-		Value: providers.PickKey(Name, c.config.VirusTotal.APIKeys),
+	if ctx.Err() != nil {
+		return nil
 	}
 
-	cursor := ""
-	for page := uint(0); ; page++ {
+	logrus.WithField("provider", Name).Infof("fetching %s", domain)
+	urls, err := c.fetchReportURLs(domain)
+	if err != nil {
+		return err
+	}
+
+	for _, rawURL := range urls {
+		scheme, _, _ := strings.Cut(rawURL, ":")
+		if !strings.EqualFold(scheme, "http") && !strings.EqualFold(scheme, "https") {
+			continue
+		}
+		if !providers.MatchesDomain(rawURL, domain, c.config.IncludeSubdomains) {
+			continue
+		}
 		select {
 		case <-ctx.Done():
 			return nil
-		default:
-			logrus.WithFields(logrus.Fields{"provider": Name, "page": page}).Infof("fetching %s", domain)
-			apiURL := fmt.Sprintf("https://www.virustotal.com/api/v3/domains/%s/urls?limit=40", domain)
-			if cursor != "" {
-				apiURL += "&cursor=" + cursor
-			}
-
-			resp, err := httpclient.MakeRequest(c.config.Client, apiURL, c.config.MaxRetries, c.config.Timeout, header)
-			if err != nil {
-				// The /urls endpoint is restricted on many community keys, and
-				// httpclient collapses non-200 status codes into one error. Fall
-				// back to /subdomains so the provider still returns data.
-				logrus.WithField("provider", Name).Infof("virustotal urls endpoint unavailable (%v), querying subdomains", err)
-				return c.fetchSubdomains(ctx, domain, header, results)
-			}
-
-			var result vtURLResponse
-			if err := jsoniter.NewDecoder(bytes.NewReader(resp)).Decode(&result); err != nil {
-				return fmt.Errorf("failed to decode virustotal result: %s", err)
-			}
-
-			if result.Error != nil {
-				if result.Error.Code == "ForbiddenError" {
-					return c.fetchSubdomains(ctx, domain, header, results)
-				}
-				return fmt.Errorf("virustotal error: %s", result.Error.Message)
-			}
-
-			for _, item := range result.Data {
-				if item.Attributes.URL != "" {
-					results <- item.Attributes.URL
-				}
-			}
-
-			if result.Links.Next == "" {
-				return nil
-			}
-
-			cursor = parseCursor(result.Links.Next)
-			if cursor == "" {
-				return nil
-			}
+		case results <- rawURL:
 		}
 	}
+	return nil
 }
 
-func (c *Client) fetchSubdomains(ctx context.Context, domain string, header httpclient.Header, results chan string) error {
-	cursor := ""
-	for page := uint(0); ; page++ {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-			apiURL := fmt.Sprintf("https://www.virustotal.com/api/v3/domains/%s/subdomains?limit=40", domain)
-			if cursor != "" {
-				apiURL += "&cursor=" + cursor
-			}
-
-			resp, err := httpclient.MakeRequest(c.config.Client, apiURL, c.config.MaxRetries, c.config.Timeout, header)
-			if err != nil {
-				return nil
-			}
-
-			var result vtSubdomainResponse
-			if err := jsoniter.NewDecoder(bytes.NewReader(resp)).Decode(&result); err != nil {
-				return nil
-			}
-
-			for _, item := range result.Data {
-				if item.ID != "" {
-					results <- fmt.Sprintf("https://%s/", item.ID)
-				}
-			}
-
-			if result.Links.Next == "" {
-				return nil
-			}
-
-			cursor = parseCursor(result.Links.Next)
-			if cursor == "" {
-				return nil
-			}
-		}
+func (c *Client) fetchReportURLs(domain string) ([]string, error) {
+	query := url.Values{
+		"apikey": {providers.PickKey(Name, c.config.VirusTotal.APIKeys)},
+		"domain": {domain},
 	}
-}
-
-func parseCursor(nextURL string) string {
-	parts := strings.Split(nextURL, "cursor=")
-	if len(parts) > 1 {
-		return strings.Split(parts[1], "&")[0]
+	apiURL := "https://www.virustotal.com/vtapi/v2/domain/report?" + query.Encode()
+	body, err := httpclient.MakeRequest(c.httpClient, apiURL, c.config.MaxRetries, c.config.Timeout)
+	switch err {
+	case nil:
+	case httpclient.ErrBadRequest, httpclient.ErrNon200Response, httpclient.ErrNilResponse, fasthttp.ErrTimeout:
+		return nil, fmt.Errorf("failed to request virustotal domain report: %w", err)
+	default:
+		// A transport error can contain the request URL, including the API key.
+		return nil, errors.New("failed to request virustotal domain report")
 	}
-	return ""
+
+	var report domainReport
+	if err := json.Unmarshal(body, &report); err != nil {
+		return nil, errors.New("failed to decode virustotal domain report")
+	}
+	if report.ResponseCode == nil {
+		return nil, errors.New("missing virustotal domain report response code")
+	}
+	switch *report.ResponseCode {
+	case 0:
+		return nil, nil
+	case 1:
+	default:
+		return nil, errors.New("unexpected virustotal domain report response code")
+	}
+
+	urls := make([]string, 0, len(report.DetectedURLs)+len(report.UndetectedURLs))
+	for _, detected := range report.DetectedURLs {
+		urls = append(urls, detected.URL)
+	}
+	for _, undetected := range report.UndetectedURLs {
+		urls = append(urls, undetected[0])
+	}
+	return urls, nil
 }

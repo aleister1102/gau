@@ -67,6 +67,7 @@ An example configuration file can be found [here](https://github.com/lc/gau/blob
 - `firecrawl` calls the map endpoint once per domain, returns up to 5000 links, and waits 6 seconds between domains.
 - `intelx` (Intelligence X Phonebook) searches URLs for the domain through `2.intelx.io`. Phonebook needs a paid key; free and academic keys get no Phonebook access. Set it with `[intelx] apikey` in the config or the `INTELX_APIKEY` environment variable. It polls for up to about 60 seconds per domain.
 - `urlscan` is supported but is not in the default provider list. Add it to `providers` or pass `--providers urlscan` to use it.
+- `virustotal` uses the [v2 domain report](https://docs.virustotal.com/v2.0/reference/domain-report) to fetch URL samples with a free API key. Use `--subs` to include URLs on subdomains when they appear in the report. The report is not a complete URL history.
 
 ## Shell completion
 `gau --completion <shell>` prints a completion script for `bash`, `zsh`, `fish`, or `sh` and exits.
